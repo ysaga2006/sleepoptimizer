@@ -61,3 +61,59 @@
         return endH > startH ? endH - startH : 24 - startH + endH;
       });
 
+      const avgSleep = durations.reduce((a, b) => a + b, 0) / durations.length;
+      const sleepDebt = Math.max(0, 7.5 - avgSleep);
+      const targetSleep = 7.5 + sleepDebt * 0.6;
+      const targetBedtime = wakeDecimal - targetSleep;
+
+      const cycles = [4.5, 6.0, 7.5, 9.0];
+      const options = cycles.map(cycle => {
+        const bedtime = wakeDecimal - cycle;
+        return {
+          label: `周期一致 (${cycle}h)`,
+          bedtime: formatTime(bedtime),
+          wake: formatTime(wakeDecimal),
+          duration: cycle.toFixed(1)
+        };
+      });
+
+      options.push({
+        label: "睡眠負債調整 + リズム維持",
+        bedtime: formatTime(targetBedtime),
+        wake: formatTime(wakeDecimal),
+        duration: targetSleep.toFixed(1)
+      });
+
+      options.sort((a, b) => parseTime(a.bedtime) - parseTime(b.bedtime));
+
+      const resultsEl = document.getElementById("results");
+      resultsEl.innerHTML = "<h2 class='text-xl font-semibold text-center'>おすすめの就寝時刻</h2>" +
+        options.map(r => `
+          <div class='border rounded p-4 bg-white dark:bg-gray-800'>
+            <div class='font-bold text-lg'>${r.bedtime} → ${r.wake}</div>
+            <div class='text-sm text-gray-600 dark:text-gray-300'>${r.label}（${r.duration} 時間）</div>
+          </div>`).join("");
+    }
+
+    const container = document.getElementById("sleep-inputs");
+    sleepData.forEach((entry, i) => {
+      const div = document.createElement("div");
+      div.className = "flex flex-col sm:flex-row sm:items-center sm:gap-2";
+      div.innerHTML = `
+        <span class="w-full sm:w-16 font-medium">${i + 1}日目</span>
+        <div class="flex gap-2 mt-1 sm:mt-0">
+          <input type="time" value="${entry.start}" class="w-full p-2 rounded border" id="start-${i}" />
+          <span class="self-center">〜</span>
+          <input type="time" value="${entry.end}" class="w-full p-2 rounded border" id="end-${i}" />
+        </div>
+      `;
+      container.appendChild(div);
+    });
+
+    for (let i = 0; i < 7; i++) {
+      document.getElementById(`start-${i}`).addEventListener("change", e => sleepData[i].start = e.target.value);
+      document.getElementById(`end-${i}`).addEventListener("change", e => sleepData[i].end = e.target.value);
+    }
+  </script>
+</body>
+</html>

@@ -3,139 +3,155 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>睡眠最適化ツール</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class'
-    };
-  </script>
+  <title>睡眠スケジュール最適化</title>
+  <style>
+    body {
+      background-color: #121212;
+      color: #e0e0e0;
+      font-family: sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 1.5em;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+
+    label {
+      display: block;
+      margin-top: 10px;
+    }
+
+    input[type="time"],
+    input[type="number"],
+    input[type="date"],
+    button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      background-color: #1e1e1e;
+      color: #e0e0e0;
+      border: 1px solid #333;
+      border-radius: 5px;
+    }
+
+    button {
+      margin-top: 20px;
+      background-color: #333;
+      cursor: pointer;
+    }
+
+    #result {
+      margin-top: 20px;
+      padding: 10px;
+      background-color: #1e1e1e;
+      border-radius: 5px;
+    }
+
+    @media (max-width: 600px) {
+      input, button {
+        font-size: 16px;
+      }
+    }
+  </style>
 </head>
-<body class="bg-white text-black dark:bg-gray-900 dark:text-white transition-colors">
-  <div class="max-w-xl mx-auto p-4 space-y-6 bg-white dark:bg-gray-800 rounded-lg shadow">
-    <h1 class="text-2xl font-bold text-center">睡眠最適化ツール</h1>
+<body>
+  <h1>睡眠スケジュール最適化</h1>
 
-    <div id="sleep-inputs" class="space-y-4"></div>
-
-    <div class="space-y-2">
-      <label class="block font-medium">普段の起床予定時刻</label>
-      <input type="time" id="wakeTime" class="w-full p-2 rounded border dark:bg-gray-700 dark:border-gray-600" />
+  <form id="sleepForm">
+    <div id="sleepData">
+      <p>過去1週間の睡眠記録（任意）:</p>
+      <div id="sleepInputs"></div>
     </div>
 
-    <div class="space-y-2">
-      <label class="block font-medium">（オプション）〇日後に起きたい時間</label>
-      <input type="number" min="1" max="7" id="daysUntilTarget" class="w-full p-2 rounded border dark:bg-gray-700 dark:border-gray-600" placeholder="何日後" />
-      <input type="time" id="targetWakeTime" class="w-full p-2 rounded border dark:bg-gray-700 dark:border-gray-600" placeholder="起床時刻" />
-    </div>
+    <label>予定の起床日時（何日後に何時に起きたいか）:</label>
+    <input type="date" id="targetDate" />
+    <input type="time" id="targetTime" />
 
-    <button onclick="handleCalculate()" class="w-full bg-blue-500 text-white font-bold py-2 px-4 rounded hover:bg-blue-600">最適な就寝時刻を計算</button>
+    <label>欲しい睡眠時間（時間）:</label>
+    <input type="number" id="desiredSleep" min="1" max="12" step="0.5" />
 
-    <div id="results" class="space-y-4"></div>
+    <button type="button" onclick="calculateSchedule()">スケジュールを計算</button>
+  </form>
 
-    <div class="text-center pt-6">
-      <button onclick="document.body.classList.toggle('dark')" class="text-sm underline">ダークモード切り替え</button>
-    </div>
-  </div>
+  <div id="result"></div>
 
   <script>
-    const sleepData = Array(7).fill({ start: "00:00", end: "07:00" });
+    const sleepInputs = document.getElementById("sleepInputs");
+    const days = ["月", "火", "水", "木", "金", "土", "日"];
 
-    function parseTime(timeStr) {
-      const [h, m] = timeStr.split(":").map(Number);
+    // 入力欄を動的に生成（空白でもOK）
+    days.forEach((day, i) => {
+      const sleepHTML = `
+        <label>${day}曜日</label>
+        <input type="time" id="bed${i}" placeholder="就寝時刻">
+        <input type="time" id="wake${i}" placeholder="起床時刻">
+      `;
+      sleepInputs.innerHTML += sleepHTML;
+    });
+
+    function timeToHours(t) {
+      if (!t) return null;
+      const [h, m] = t.split(":").map(Number);
       return h + m / 60;
     }
 
-    function formatTime(decimalHours) {
-      let h = Math.floor(decimalHours) % 24;
-      let m = Math.round((decimalHours % 1) * 60);
-      if (m < 0) m += 60, h--;
-      if (h < 0) h += 24;
-      return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    function hoursToTime(h) {
+      const hour = Math.floor(h) % 24;
+      const minute = Math.round((h % 1) * 60);
+      return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
     }
 
-    function handleCalculate() {
-      const wakeTime = document.getElementById("wakeTime").value || "07:00";
-      const targetWakeTime = document.getElementById("targetWakeTime").value;
-      const daysUntilTarget = parseInt(document.getElementById("daysUntilTarget").value);
+    function calculateSchedule() {
+      const sleepTimes = [];
 
-      const wakeDecimal = parseTime(wakeTime);
-      const durations = sleepData.map(({ start, end }) => {
-        const startH = parseTime(start);
-        const endH = parseTime(end);
-        return endH > startH ? endH - startH : 24 - startH + endH;
-      });
-
-      const avgSleep = durations.reduce((a, b) => a + b, 0) / durations.length;
-      const sleepDebt = Math.max(0, 7.5 - avgSleep);
-      const baseTargetSleep = 7.5 + sleepDebt * 0.6;
-
-      let plans = [];
-
-      if (targetWakeTime && daysUntilTarget) {
-        const today = parseTime(wakeTime);
-        const target = parseTime(targetWakeTime);
-        const step = (today - target) / daysUntilTarget;
-
-        for (let d = 1; d <= daysUntilTarget; d++) {
-          const dayWake = today - step * d;
-          const bedtime = dayWake - baseTargetSleep;
-          plans.push({
-            day: d,
-            label: `${d}日後の計画`,
-            bedtime: formatTime(bedtime),
-            wake: formatTime(dayWake),
-            duration: baseTargetSleep.toFixed(1)
-          });
+      for (let i = 0; i < 7; i++) {
+        const bed = timeToHours(document.getElementById(`bed${i}`).value);
+        const wake = timeToHours(document.getElementById(`wake${i}`).value);
+        if (bed !== null && wake !== null) {
+          const duration = wake > bed ? wake - bed : 24 - bed + wake;
+          sleepTimes.push({ bed, wake, duration });
         }
-      } else {
-        const targetBedtime = wakeDecimal - baseTargetSleep;
-
-        const cycles = [4.5, 6.0, 7.5, 9.0];
-        plans = cycles.map(cycle => {
-          const bedtime = wakeDecimal - cycle;
-          return {
-            label: `周期一致 (${cycle}h)`,
-            bedtime: formatTime(bedtime),
-            wake: formatTime(wakeDecimal),
-            duration: cycle.toFixed(1)
-          };
-        });
-
-        plans.push({
-          label: "睡眠負債調整 + リズム維持",
-          bedtime: formatTime(targetBedtime),
-          wake: formatTime(wakeDecimal),
-          duration: baseTargetSleep.toFixed(1)
-        });
       }
 
-      const resultsEl = document.getElementById("results");
-      resultsEl.innerHTML = `<h2 class='text-xl font-semibold text-center'>おすすめの就寝計画</h2>` +
-        plans.map(r => `
-          <div class='border rounded p-4 bg-gray-100 dark:bg-gray-700'>
-            <div class='font-bold text-lg'>${r.bedtime} → ${r.wake}</div>
-            <div class='text-sm text-gray-600 dark:text-gray-300'>${r.label}（${r.duration} 時間）</div>
-          </div>`).join("");
-    }
+      const avgSleep = sleepTimes.length
+        ? sleepTimes.reduce((sum, d) => sum + d.duration, 0) / sleepTimes.length
+        : 7;
 
-    const container = document.getElementById("sleep-inputs");
-    sleepData.forEach((entry, i) => {
-      const div = document.createElement("div");
-      div.className = "flex flex-col sm:flex-row sm:items-center sm:gap-2";
-      div.innerHTML = `
-        <span class="w-full sm:w-16 font-medium">${i + 1}日目</span>
-        <div class="flex gap-2 mt-1 sm:mt-0">
-          <input type="time" value="${entry.start}" class="w-full p-2 rounded border dark:bg-gray-700 dark:border-gray-600" id="start-${i}" />
-          <span class="self-center">〜</span>
-          <input type="time" value="${entry.end}" class="w-full p-2 rounded border dark:bg-gray-700 dark:border-gray-600" id="end-${i}" />
-        </div>
-      `;
-      container.appendChild(div);
-    });
+      const desiredSleep = parseFloat(document.getElementById("desiredSleep").value) || avgSleep;
 
-    for (let i = 0; i < 7; i++) {
-      document.getElementById(`start-${i}`).addEventListener("change", e => sleepData[i].start = e.target.value);
-      document.getElementById(`end-${i}`).addEventListener("change", e => sleepData[i].end = e.target.value);
+      const date = new Date(document.getElementById("targetDate").value);
+      const [h, m] = (document.getElementById("targetTime").value || "07:00").split(":").map(Number);
+      date.setHours(h, m, 0, 0);
+
+      const today = new Date();
+      const daysLeft = Math.floor((date - today) / (1000 * 60 * 60 * 24));
+      const output = [];
+
+      let nextWakeTime = h + m / 60;
+
+      for (let d = daysLeft; d >= 1; d--) {
+        const bedTime = nextWakeTime - desiredSleep;
+        const corrected = bedTime < 0 ? 24 + bedTime : bedTime;
+        const day = new Date(today);
+        day.setDate(today.getDate() + d - 1);
+
+        output.unshift({
+          date: day.toDateString(),
+          bed: hoursToTime(corrected),
+          wake: hoursToTime(nextWakeTime),
+        });
+
+        nextWakeTime = corrected;
+      }
+
+      const resultDiv = document.getElementById("result");
+      resultDiv.innerHTML = "<h3>おすすめスケジュール:</h3>";
+      output.forEach((d) => {
+        resultDiv.innerHTML += `<p>${d.date}：${d.bed} 就寝 → ${d.wake} 起床</p>`;
+      });
     }
   </script>
 </body>

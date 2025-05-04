@@ -13,8 +13,16 @@
     }
 
     h1 {
-      text-align: center;
-    }
+  text-align: center;
+  font-size: 2rem;
+  white-space: nowrap; /* 改行を防ぐ */
+}
+
+@media (max-width: 600px) {
+  h1 {
+    font-size: 1.5rem;
+  }
+}
 
     label, input, select {
       display: block;
@@ -57,12 +65,21 @@
   <input type="time" id="targetTime" />
 
   <label>理想の睡眠時間（時間）:</label>
-  <select id="desiredSleep">
-    ${[...Array(13)].map((_, i) => {
-      const val = 4 + i * 0.5;
-      return `<option value="${val}">${val} 時間</option>`;
-    }).join("")}
-  </select>
+ <select id="desiredSleep">
+  <option value="4">4 時間</option>
+  <option value="4.5">4.5 時間</option>
+  <option value="5">5 時間</option>
+  <option value="5.5">5.5 時間</option>
+  <option value="6">6 時間</option>
+  <option value="6.5">6.5 時間</option>
+  <option value="7">7 時間</option>
+  <option value="7.5">7.5 時間</option>
+  <option value="8">8 時間</option>
+  <option value="8.5">8.5 時間</option>
+  <option value="9">9 時間</option>
+  <option value="9.5">9.5 時間</option>
+  <option value="10">10 時間</option>
+</select>
 
   <button type="button" onclick="calculateSchedule()">スケジュールを計算</button>
   <button type="button" onclick="saveData()">記録を保存</button>

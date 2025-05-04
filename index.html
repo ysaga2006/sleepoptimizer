@@ -9,37 +9,29 @@
       background-color: #121212;
       color: #e0e0e0;
       font-family: sans-serif;
-      margin: 0;
       padding: 20px;
     }
 
     h1 {
-      font-size: 1.5em;
-      margin-bottom: 10px;
       text-align: center;
     }
 
-    label {
+    label, input, select {
       display: block;
+      width: 100%;
       margin-top: 10px;
     }
 
-    input[type="time"],
-    input[type="number"],
-    input[type="date"],
-    button {
-      width: 100%;
+    input, select, button {
       padding: 10px;
-      margin-top: 5px;
       background-color: #1e1e1e;
       color: #e0e0e0;
-      border: 1px solid #333;
+      border: 1px solid #444;
       border-radius: 5px;
     }
 
     button {
       margin-top: 20px;
-      background-color: #333;
       cursor: pointer;
     }
 
@@ -49,110 +41,163 @@
       background-color: #1e1e1e;
       border-radius: 5px;
     }
-
-    @media (max-width: 600px) {
-      input, button {
-        font-size: 16px;
-      }
-    }
   </style>
 </head>
 <body>
-  <h1>睡眠スケジュール最適化</h1>
 
-  <form id="sleepForm">
-    <div id="sleepData">
-      <p>過去1週間の睡眠記録（任意）:</p>
-      <div id="sleepInputs"></div>
-    </div>
+<h1>睡眠スケジュール最適化</h1>
 
-    <label>予定の起床日時（何日後に何時に起きたいか）:</label>
-    <input type="date" id="targetDate" />
-    <input type="time" id="targetTime" />
+<form id="sleepForm">
+  <div id="dateInputs"></div>
 
-    <label>欲しい睡眠時間（時間）:</label>
-    <input type="number" id="desiredSleep" min="1" max="12" step="0.5" />
+  <label>予定の起床日:</label>
+  <input type="date" id="targetDate" />
 
-    <button type="button" onclick="calculateSchedule()">スケジュールを計算</button>
-  </form>
+  <label>予定の起床時刻:</label>
+  <input type="time" id="targetTime" />
 
-  <div id="result"></div>
+  <label>理想の睡眠時間（時間）:</label>
+  <select id="desiredSleep">
+    ${[...Array(13)].map((_, i) => {
+      const val = 4 + i * 0.5;
+      return `<option value="${val}">${val} 時間</option>`;
+    }).join("")}
+  </select>
 
-  <script>
-    const sleepInputs = document.getElementById("sleepInputs");
-    const days = ["月", "火", "水", "木", "金", "土", "日"];
+  <button type="button" onclick="calculateSchedule()">スケジュールを計算</button>
+  <button type="button" onclick="saveData()">記録を保存</button>
+</form>
 
-    // 入力欄を動的に生成（空白でもOK）
-    days.forEach((day, i) => {
-      const sleepHTML = `
-        <label>${day}曜日</label>
-        <input type="time" id="bed${i}" placeholder="就寝時刻">
-        <input type="time" id="wake${i}" placeholder="起床時刻">
+<div id="result"></div>
+
+<script>
+  const dateInputs = document.getElementById("dateInputs");
+
+  function formatDate(date) {
+    return date.toISOString().split("T")[0];
+  }
+
+  // 過去7日分の日付入力欄を作成
+  function generateInputs() {
+    const today = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const dateStr = formatDate(d);
+      dateInputs.innerHTML += `
+        <label>${dateStr}</label>
+        <input type="time" id="bed_${dateStr}" placeholder="就寝時間">
+        <input type="time" id="wake_${dateStr}" placeholder="起床時間">
       `;
-      sleepInputs.innerHTML += sleepHTML;
-    });
+    }
+  }
 
-    function timeToHours(t) {
-      if (!t) return null;
-      const [h, m] = t.split(":").map(Number);
-      return h + m / 60;
+  generateInputs();
+
+  // ローカルストレージに保存
+  function saveData() {
+    const sleepData = {};
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dateStr = formatDate(date);
+      const bed = document.getElementById(`bed_${dateStr}`).value;
+      const wake = document.getElementById(`wake_${dateStr}`).value;
+      sleepData[dateStr] = { bed, wake };
+    }
+    localStorage.setItem("sleepRecords", JSON.stringify(sleepData));
+    alert("保存しました。");
+  }
+
+  function loadData() {
+    const saved = JSON.parse(localStorage.getItem("sleepRecords") || "{}");
+    for (const date in saved) {
+      const bed = saved[date].bed;
+      const wake = saved[date].wake;
+      const bedInput = document.getElementById(`bed_${date}`);
+      const wakeInput = document.getElementById(`wake_${date}`);
+      if (bedInput && wakeInput) {
+        bedInput.value = bed;
+        wakeInput.value = wake;
+      }
+    }
+  }
+
+  loadData();
+
+  function timeToHours(t) {
+    if (!t) return null;
+    const [h, m] = t.split(":").map(Number);
+    return h + m / 60;
+  }
+
+  function hoursToTime(h) {
+    const hour = Math.floor(h) % 24;
+    const minute = Math.round((h % 1) * 60);
+    return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+  }
+
+  function calculateSchedule() {
+    const records = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dateStr = formatDate(date);
+      const bed = timeToHours(document.getElementById(`bed_${dateStr}`).value);
+      const wake = timeToHours(document.getElementById(`wake_${dateStr}`).value);
+      if (bed != null && wake != null) {
+        const duration = wake > bed ? wake - bed : 24 - bed + wake;
+        records.push({ date: dateStr, duration, wake });
+      }
     }
 
-    function hoursToTime(h) {
-      const hour = Math.floor(h) % 24;
-      const minute = Math.round((h % 1) * 60);
-      return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+    const avgSleep = records.length
+      ? records.reduce((sum, r) => sum + r.duration, 0) / records.length
+      : 7;
+
+    const desiredSleep = parseFloat(document.getElementById("desiredSleep").value) || avgSleep;
+
+    const targetDate = new Date(document.getElementById("targetDate").value);
+    const [targetHour, targetMin] = document.getElementById("targetTime").value.split(":").map(Number);
+    targetDate.setHours(targetHour, targetMin, 0, 0);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const daysUntil = Math.round((targetDate - today) / (1000 * 60 * 60 * 24));
+
+    if (daysUntil < 1) {
+      alert("起床予定は明日以降を選んでください");
+      return;
     }
 
-    function calculateSchedule() {
-      const sleepTimes = [];
+    let currentWake = targetHour + targetMin / 60;
+    const schedule = [];
 
-      for (let i = 0; i < 7; i++) {
-        const bed = timeToHours(document.getElementById(`bed${i}`).value);
-        const wake = timeToHours(document.getElementById(`wake${i}`).value);
-        if (bed !== null && wake !== null) {
-          const duration = wake > bed ? wake - bed : 24 - bed + wake;
-          sleepTimes.push({ bed, wake, duration });
-        }
-      }
+    for (let i = daysUntil - 1; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(today.getDate() + i);
 
-      const avgSleep = sleepTimes.length
-        ? sleepTimes.reduce((sum, d) => sum + d.duration, 0) / sleepTimes.length
-        : 7;
+      const targetSleep = desiredSleep;
+      const proposedWake = Math.min(currentWake + 1, 24); // 極端に早くしない
+      const wake = Math.max(proposedWake - 1, 4); // 最小4時起床
+      const bedtime = (wake - targetSleep + 24) % 24;
 
-      const desiredSleep = parseFloat(document.getElementById("desiredSleep").value) || avgSleep;
-
-      const date = new Date(document.getElementById("targetDate").value);
-      const [h, m] = (document.getElementById("targetTime").value || "07:00").split(":").map(Number);
-      date.setHours(h, m, 0, 0);
-
-      const today = new Date();
-      const daysLeft = Math.floor((date - today) / (1000 * 60 * 60 * 24));
-      const output = [];
-
-      let nextWakeTime = h + m / 60;
-
-      for (let d = daysLeft; d >= 1; d--) {
-        const bedTime = nextWakeTime - desiredSleep;
-        const corrected = bedTime < 0 ? 24 + bedTime : bedTime;
-        const day = new Date(today);
-        day.setDate(today.getDate() + d - 1);
-
-        output.unshift({
-          date: day.toDateString(),
-          bed: hoursToTime(corrected),
-          wake: hoursToTime(nextWakeTime),
-        });
-
-        nextWakeTime = corrected;
-      }
-
-      const resultDiv = document.getElementById("result");
-      resultDiv.innerHTML = "<h3>おすすめスケジュール:</h3>";
-      output.forEach((d) => {
-        resultDiv.innerHTML += `<p>${d.date}：${d.bed} 就寝 → ${d.wake} 起床</p>`;
+      schedule.unshift({
+        date: formatDate(date),
+        wake: hoursToTime(wake),
+        bed: hoursToTime(bedtime),
       });
+
+      currentWake = wake;
     }
-  </script>
+
+    const result = document.getElementById("result");
+    result.innerHTML = "<h3>おすすめスケジュール:</h3>";
+    schedule.forEach((d) => {
+      result.innerHTML += `<p>${d.date}：${d.bed} 就寝 → ${d.wake} 起床</p>`;
+    });
+  }
+</script>
+
 </body>
 </html>
